@@ -1,0 +1,219 @@
+#Feature Engineering
+#Age of customer today 
+data["Age"] = 2021-data["Year_Birth"]
+
+#Total spendings on various items
+data["Spent"] = data["MntWines"]+ data["MntFruits"]+ data["MntMeatProducts"]+ data["MntFishProducts"]+ data["MntSweetProducts"]+ data["MntGoldProds"]
+
+#Deriving living situation by marital status"Alone"
+data["Living_With"]=data["Marital_Status"].replace({"Married":"Partner", "Together":"Partner", "Absurd":"Alone", "Widow":"Alone", "YOLO":"Alone", "Divorced":"Alone", "Single":"Alone",})
+
+#Feature indicating total children living in the household
+data["Children"]=data["Kidhome"]+data["Teenhome"]
+
+#Feature for total members in the householde
+data["Family_Size"] = data["Living_With"].replace({"Alone": 1, "Partner":2})+ data["Children"]
+
+#Feature pertaining parenthood
+data["Is_Parent"] = np.where(data.Children> 0, 1, 0)
+
+#Segmenting education levels in three groups
+data["Education"]=data["Education"].replace({"Basic":"Undergraduate","2n Cycle":"Undergraduate", "Graduation":"Graduate", "Master":"Postgraduate", "PhD":"Postgraduate"})
+
+#Dropping some of the redundant features
+to_drop = ["Marital_Status", "Z_CostContact", "Z_Revenue", "Year_Birth", "ID", "Dt_Customer", "MntWines", "MntFruits", 
+           "MntMeatProducts", "MntFishProducts", "MntSweetProducts", "MntGoldProds", "Kidhome", "Teenhome"]
+data = data.drop(to_drop, axis=1)
+
+# creating a subset of dataframe by dropping the features on deals accepted and promotions
+cols_del = ['AcceptedCmp3', 'AcceptedCmp4', 'AcceptedCmp5', 'AcceptedCmp1','AcceptedCmp2', 'Complain', 'Response']
+data = data.drop(cols_del, axis=1)
+
+#Plotting following features
+To_Plot = ["Income", "Recency", "Age", "Spent", "Is_Parent"]
+sns.pairplot(data[To_Plot], hue= "Is_Parent", palette= (["#682F2F","#F3AB60"]))
+plt.figure() 
+plt.show()
+
+#correlation matrix
+corrmat= data.corr()
+plt.figure(figsize=(20,20))  
+sns.heatmap(corrmat,annot=True, cmap = "PuOr_r")
+
+#Get list of categorical variables
+s = (data.dtypes == 'object')
+object_cols = list(s[s].index)
+
+#Label Encoding the object dtypes.
+LE=LabelEncoder()
+for i in object_cols:
+    data[i]=data[[i]].apply(LE.fit_transform)
+
+# all features are now numerical
+
+#Initiating PCA to reduce dimentions aka features to 3
+pca = PCA(n_components=8)
+pca.fit(scaled_ds)
+PCA_ds = pd.DataFrame(pca.transform(scaled_ds), columns=(["col1","col2", "col3", "col4", "col5", "col6", "col7", "col8"]))
+PCA_ds.describe()
+
+# clustering based on PCA
+# elbow method to find numbers of clusters to make
+Elbow_M = KElbowVisualizer(KMeans(), k=10)
+Elbow_M.fit(PCA_ds)
+Elbow_M.show()  # TBC: continue to do further customer profiling
+
+#Initiating PCA to reduce dimentions aka features to 3
+pca = PCA(n_components=3)
+pca.fit(scaled_ds)
+PCA_ds = pd.DataFrame(pca.transform(scaled_ds), columns=(["col1","col2", "col3"]))
+PCA_ds.describe().T
+
+#A 3D Projection Of Data In The Reduced Dimension
+x =PCA_ds["col1"]
+y =PCA_ds["col2"]
+z =PCA_ds["col3"]
+#To plot
+fig = plt.figure(figsize=(10,8))
+ax = fig.add_subplot(111, projection="3d")
+ax.scatter(x,y,z, c="maroon", marker="o" )
+ax.set_title("A 3D Projection Of Data In The Reduced Dimension")
+plt.show()
+
+#Initiating the Agglomerative Clustering model 
+AC = AgglomerativeClustering(n_clusters=4)
+# fit model and predict clusters
+yhat_AC = AC.fit_predict(PCA_ds)
+PCA_ds["Clusters"] = yhat_AC
+#Adding the Clusters feature to the orignal dataframe.
+data["Clusters"]= yhat_AC
+
+#Plotting the clusters
+fig = plt.figure(figsize=(10,8))
+cmap = colors.ListedColormap(["#682F2F", "#9E726F", "#D6B2B1", "#B9C0C9", "#9F8A78", "#F3AB60"])
+ax = plt.subplot(111, projection='3d', label="bla")
+ax.scatter(x, y, z, s=40, c=PCA_ds["Clusters"], marker='o', cmap = cmap )
+ax.set_title("The Plot Of The Clusters")
+plt.show()
+
+pal = ["#682F2F","#B9C0C9", "#9F8A78","#F3AB60"]
+pl = sns.scatterplot(data = data,x=data["Spent"], y=data["Income"],hue=data["Clusters"], palette= pal)
+pl.set_title("Cluster's Profile Based On Income And Spending")
+plt.legend()
+plt.show()
+
+def build_model(amount):
+    X = data2.drop(Amounts,axis=1)
+    y = data2[amount]
+    X_train, X_test, y_train, y_test = train_test_split(X,y,train_size=0.7,random_state=100)
+    
+    scaler = StandardScaler()
+    col = X_train.columns
+    X_train = scaler.fit_transform(X_train)
+    X_train = pd.DataFrame(X_train,columns=col)
+    
+    X_test = scaler.transform(X_test)
+    X_test = pd.DataFrame(X_test,columns=col)
+    
+    Model = Ridge()
+    
+    params = {'alpha':[0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3,4,5,6,7,8,9,10,
+                      20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000]}
+    
+    grid_search = GridSearchCV(estimator=Model,param_grid=params,n_jobs=-1,verbose=1,scoring='r2')
+    grid_search.fit(X_train,y_train)
+    
+    Model_best = grid_search.best_estimator_
+    
+    y_train_pred = Model_best.predict(X_train)
+    y_test_pred = Model_best.predict(X_test)
+    
+    print('Train_score'+' '+'='+' '+str(r2_score(y_train,y_train_pred)))
+    print('Test_score'+' '+'='+' '+str(r2_score(y_test,y_test_pred)))
+    
+    Feature_coef['Feature'] = X_train.columns
+    Feature_coef['Coef_'+amount] = Model_best.coef_
+
+for amount in Amounts:
+  build_model(amount)
+
+def build_model(amount):
+    X = data2.drop(Amounts,axis=1)
+    y = data2[amount]
+    X_train, X_test, y_train, y_test = train_test_split(X,y,train_size=0.7,random_state=100)
+    
+    scaler = StandardScaler()
+    col = X_train.columns
+    X_train = scaler.fit_transform(X_train)
+    X_train = pd.DataFrame(X_train,columns=col)
+    
+    X_test = scaler.transform(X_test)
+    X_test = pd.DataFrame(X_test,columns=col)
+    
+    Model = Lasso()
+    
+    params = {'alpha':[0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,2,3,4,5,6,7,8,9,10,
+                      20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000]}
+    
+    grid_search = GridSearchCV(estimator=Model,param_grid=params,n_jobs=-1,verbose=1,scoring='r2')
+    grid_search.fit(X_train,y_train)
+    
+    Model_best = grid_search.best_estimator_
+    
+    y_train_pred = Model_best.predict(X_train)
+    y_test_pred = Model_best.predict(X_test)
+    
+    print('Train_score'+' '+'='+' '+str(r2_score(y_train,y_train_pred)))
+    print('Test_score'+' '+'='+' '+str(r2_score(y_test,y_test_pred)))
+    
+    Feature_coef['Feature'] = X_train.columns
+    Feature_coef['Coef_'+amount] = Model_best.coef_
+
+for amount in Amounts:
+    build_model(amount)
+
+def build_model(amount):
+    X = data2.drop(Amounts,axis=1)
+    y = data2[amount]
+    X_train, X_test, y_train, y_test = train_test_split(X,y,train_size=0.7,random_state=100)
+    
+    Model = GradientBoostingRegressor(random_state=100)
+    
+    params = {'learning_rate':[0.1,0.2,0.3,0.4,0.5],
+              'min_samples_leaf':[20,40,60],
+              'max_depth':[2,5,8,10,15,17,20],
+              'max_features':[0.1,0.2,0.3,0.4]}
+    
+    grid_search = GridSearchCV(estimator=Model,param_grid=params,n_jobs=-1,verbose=1,scoring='r2')
+    grid_search.fit(X_train,y_train)
+    
+    Model_best = grid_search.best_estimator_
+    
+    y_train_pred = Model_best.predict(X_train)
+    y_test_pred = Model_best.predict(X_test)
+    
+    print('Train_score'+' '+'='+' '+str(r2_score(y_train,y_train_pred)))
+    print('Test_score'+' '+'='+' '+str(r2_score(y_test,y_test_pred)))
+    
+    Feature_importance['Feature'] = X_train.columns
+    Feature_importance['Importance_'+amount] = Model_best.feature_importances_
+
+for amount in Amounts:
+  build_model(amount)
+
+Model_best = grid_search.best_estimator_
+y_train_pred = Model_best.predict(X_train)
+y_test_pred = Model_best.predict(X_test)
+
+print(accuracy_score(y_train,y_train_pred))
+print(accuracy_score(y_test,y_test_pred))
+
+data2["Spent"] = data2["Wines"]+ data2["Fruits"]+ data2["Meat"]+ data2["Fish"]+ data2["Sweets"]+ data2["Gold"]
+
+data2["Spent"] = np.log(data2["Spent"])
+data2["Income"] = np.log(data2["Income"])
+
+data2.plot(x="Income", y="Spent", kind="scatter")
+
+sns.regplot(x="Income", y="Spent", data=data2, lowess=True, ci=None)
+
